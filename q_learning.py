@@ -10,21 +10,34 @@ def run_q_learning(env, episodes=500):
     # Initialize Q-Table
     Q = np.zeros((env.n_states, env.n_actions))
 
-    rewards_history = []
+    # NEW: Dictionary to store all metrics
+    metrics = {
+        'rewards': [],
+        'lengths': [],
+        'success_rate': [],
+        'exploration_ratio': []
+    }
 
-    print("🚀 Training Q-Learning Agent...")
+    print("🚀 Training Q-Learning Agent with Advanced Metrics...")
+
     for episode in range(episodes):
         state = env.reset()
         total_reward = 0
-        done = False
         steps = 0
+        done = False
+
+        # Track decisions for this episode
+        explore_count = 0
+        exploit_count = 0
 
         while not done and steps < 100:
-            # Epsilon-Greedy Strategy
+            # Epsilon-Greedy Strategy with Counting
             if np.random.uniform(0, 1) < epsilon:
                 action = np.random.randint(0, env.n_actions)  # Explore
+                explore_count += 1
             else:
                 action = np.argmax(Q[state, :])  # Exploit
+                exploit_count += 1
 
             # Take Action
             next_state, reward, done = env.step(action)
@@ -36,6 +49,18 @@ def run_q_learning(env, episodes=500):
             total_reward += reward
             steps += 1
 
-        rewards_history.append(total_reward)
+        # --- LOG METRICS ---
+        metrics['rewards'].append(total_reward)
+        metrics['lengths'].append(steps)
 
-    return rewards_history
+        # Success = 1 if it hit the goal (+10 reward), else 0
+        # Note: In environment.py, goal reward is 10.
+        is_success = 1 if reward == 10 else 0
+        metrics['success_rate'].append(is_success)
+
+        # Calculate Exploration Ratio
+        total_actions = explore_count + exploit_count
+        ratio = explore_count / total_actions if total_actions > 0 else 0
+        metrics['exploration_ratio'].append(ratio)
+
+    return metrics

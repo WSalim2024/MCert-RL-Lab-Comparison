@@ -20,7 +20,7 @@ episodes = st.sidebar.slider("Training Episodes", 100, 1000, 500, step=100)
 gamma = st.sidebar.slider("Discount Factor (Gamma)", 0.5, 0.99, 0.9)
 lr = st.sidebar.slider("Learning Rate", 0.001, 0.1, 0.01, format="%.3f")
 
-# NEW: Select a state to spy on
+# Brain Scanner Selection
 st.sidebar.markdown("---")
 st.sidebar.header("🧠 Brain Scanner")
 spy_state = st.sidebar.selectbox("Select State to Monitor",
@@ -35,27 +35,44 @@ if st.sidebar.button("🚀 Start Training Race"):
     # Create Columns for progress
     col1, col2 = st.columns(2)
 
-    # --- 1. RUN Q-LEARNING ---
+    # --- 1. RUN Q-LEARNING (Value-Based) ---
     with col1:
-        st.subheader("1. Q-Learning (Value-Based)")
+        st.subheader("1. Q-Learning")
         with st.spinner("Training Q-Agent..."):
-            q_rewards = run_q_learning(env, episodes=episodes)
+            # Returns a DICTIONARY now
+            q_metrics = run_q_learning(env, episodes=episodes)
+            q_rewards = q_metrics['rewards']
+
         st.success("Q-Learning Complete!")
         st.metric("Avg Final Reward", f"{sum(q_rewards[-50:]) / 50:.2f}")
 
-    # --- 2. RUN POLICY GRADIENT ---
+        # NEW: Advanced Metrics Expander
+        with st.expander("📊 View Advanced Q-Metrics"):
+            st.markdown("### 📉 Efficiency (Steps per Episode)")
+            st.line_chart(q_metrics['lengths'])
+
+            st.markdown("### 🎯 Success Rate (Moving Avg)")
+            # 1 = Goal, 0 = Pit/Timeout. Moving Average for smoothness.
+            success_smooth = pd.Series(q_metrics['success_rate']).rolling(window=20).mean()
+            st.line_chart(success_smooth)
+
+            st.markdown("### 🎲 Exploration Ratio")
+            st.caption("% of actions that were random")
+            st.line_chart(q_metrics['exploration_ratio'])
+
+    # --- 2. RUN POLICY GRADIENT (Policy-Based) ---
     with col2:
-        st.subheader("2. Policy Gradient (Neural Network)")
+        st.subheader("2. Policy Gradient")
         with st.spinner("Training Neural Network..."):
-            # We now get TWO returns: rewards and the brain scan history
+            # Returns a TUPLE (Rewards, Brain_History)
             pg_rewards, policy_history = run_policy_gradient(env, episodes=episodes, alpha=lr, gamma=gamma,
                                                              track_state=spy_state)
         st.success("Policy Gradient Complete!")
         st.metric("Avg Final Reward", f"{sum(pg_rewards[-50:]) / 50:.2f}")
 
-    # --- 3. REWARD VISUALIZATION ---
+    # --- 3. MAIN COMPARISON PLOT ---
     st.divider()
-    st.subheader("📈 Performance Comparison")
+    st.subheader("📈 Performance Comparison (Cumulative Rewards)")
 
     window = max(1, int(episodes / 20))
     q_smooth = pd.Series(q_rewards).rolling(window=window).mean()
@@ -71,36 +88,26 @@ if st.sidebar.button("🚀 Start Training Race"):
     ax.grid(True, alpha=0.3)
     st.pyplot(fig)
 
-    # --- 4. NEW: BRAIN VISUALIZATION ---
+    # --- 4. BRAIN SCANNER PLOT ---
     st.divider()
     st.subheader(f"🧠 Inside the Policy Network (Monitoring State {spy_state})")
     st.markdown("This chart shows the **Probability** the agent assigns to each action over time.")
 
     fig2, ax2 = plt.subplots(figsize=(10, 4))
 
-    # Actions: 0=Up, 1=Down, 2=Left, 3=Right
     labels = ["Up", "Down", "Left", "Right"]
-    colors = ["#FF5733", "#33FF57", "#3357FF", "#F333FF"]  # Distinct colors
+    colors = ["#FF5733", "#33FF57", "#3357FF", "#F333FF"]
 
     for action_idx in range(4):
-        # Plot the probability column for this action
         probs = policy_history[:, action_idx]
-        # Smooth it slightly so lines are readable
         probs_smooth = pd.Series(probs).rolling(window=10).mean()
         ax2.plot(probs_smooth, label=labels[action_idx], color=colors[action_idx], linewidth=1.5, alpha=0.8)
 
     ax2.set_title(f"Action Probabilities for State {spy_state} over Time")
     ax2.set_xlabel("Episode")
-    ax2.set_ylabel("Probability (Confidence)")
+    ax2.set_ylabel("Confidence (0.0 - 1.0)")
     ax2.set_ylim(0, 1.0)
     ax2.legend(loc='upper left')
     ax2.grid(True, alpha=0.3)
 
     st.pyplot(fig2)
-
-    st.info("""
-    **How to read the Brain Scan:**
-    * **Chaos (Start):** All lines act crazy or stay near 0.25 (25%). The agent is guessing.
-    * **Learning:** One line starts rising to the top. The agent is becoming "Confident".
-    * **Collapse:** If the lines start zigzagging wildly again later, the agent has forgotten its policy (Catastrophic Forgetting).
-    """)

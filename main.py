@@ -13,12 +13,15 @@ def main():
 
     # 2. Run Q-Learning
     print(f"\n[1/2] Running Q-Learning ({episodes} episodes)...")
-    q_rewards = run_q_learning(env, episodes=episodes)
+    # Returns DICTIONARY now -> Extract 'rewards' list
+    q_metrics = run_q_learning(env, episodes=episodes)
+    q_rewards = q_metrics['rewards']
 
     # 3. Run Policy Gradient
     print(f"\n[2/2] Running Policy Gradient ({episodes} episodes)...")
-    # Note: Policy Gradient might need a restart if it gets stuck in the first few tries
-    pg_rewards = run_policy_gradient(env, episodes=episodes, alpha=0.01, gamma=0.9)
+    # Returns TUPLE -> Extract just the first element (rewards)
+    # We ignore the second element (brain_scan) for the static plot
+    pg_rewards, _ = run_policy_gradient(env, episodes=episodes, alpha=0.01, gamma=0.9)
 
     # 4. Process Data (Moving Average for smooth plots)
     window = 25
